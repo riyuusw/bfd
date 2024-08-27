@@ -8,82 +8,99 @@ from concurrent.futures import ThreadPoolExecutor
 
 # Function to send a request
 def send_request(token):
-    conn = http.client.HTTPSConnection("api.bfdcoin.org")
-    payload = json.dumps({
-        "boxType": 1,
-        "coinCount": 210
-    })
-    headers = {
-        'accept': 'application/json, text/plain, */*',
-        'accept-language': 'en-US,en;q=0.9',
-        'cache-control': 'no-cache',
-        'content-type': 'application/json',
-        'origin': 'https://bfdcoin.org',
-        'pragma': 'no-cache',
-        'priority': 'u=1, i',
-        'referer': 'https://bfdcoin.org/',
-        'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Microsoft Edge";v="126", "Microsoft Edge WebView2";v="126"',
-        'sec-ch-ua-mobile': '?0',
-        'sec-ch-ua-platform': '"Windows"',
-        'sec-fetch-dest': 'empty',
-        'sec-fetch-mode': 'cors',
-        'sec-fetch-site': 'same-site',
-        'token': token,
-        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0'
-    }
-    conn.request("POST", "/api?act=collectSpecialBoxCoin", payload, headers)
-    res = conn.getresponse()
-    data = json.loads(res.read().decode("utf-8"))
-    if data["code"] == 0 and data["message"] == "Success":
-        collect_amount = data["data"]["collectAmount"]
-        print(f"Collect amount: {collect_amount}")
-    else:
-        print("Failed to collect coins")
+    try:
+        conn = http.client.HTTPSConnection("api.bfdcoin.org")
+        payload = json.dumps({
+            "boxType": 1,
+            "coinCount": 210
+        })
+        headers = {
+            'accept': 'application/json, text/plain, */*',
+            'accept-language': 'en-US,en;q=0.9',
+            'cache-control': 'no-cache',
+            'content-type': 'application/json',
+            'origin': 'https://bfdcoin.org',
+            'pragma': 'no-cache',
+            'priority': 'u=1, i',
+            'referer': 'https://bfdcoin.org/',
+            'sec-ch-ua': '"Not/A)Brand";v="8", "Chromium";v="126", "Microsoft Edge";v="126", "Microsoft Edge WebView2";v="126"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'same-site',
+            'token': token,
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36 Edg/126.0.0.0'
+        }
+        conn.request("POST", "/api?act=collectSpecialBoxCoin", payload, headers)
+        res = conn.getresponse()
+        res_data = res.read()
+
+        if res_data:
+            data = json.loads(res_data.decode("utf-8"))
+            if data["code"] == 0 and data["message"] == "Success":
+                collect_amount = data["data"]["collectAmount"]
+                print(f"Collect amount: {collect_amount}")
+            else:
+                print("Failed to collect coins: ", data.get("message", "Unknown error"))
+        else:
+            print("Empty response received from the server.")
+    except Exception as e:
+        print(f"Error sending request: {str(e)}")
 
 # Function to get account info
 def get_account_info(token, max_workers):
-    conn = http.client.HTTPSConnection("api.bfdcoin.org")
-    headers = {
-        'Content-Type': 'application/json',
-        'Token': token,
-        'User-Agent': 'Mozilla/5.0'
-    }
-    conn.request("POST", "/api?act=accountInfo", headers=headers)
-    res = conn.getresponse()
-    data = json.loads(res.read().decode("utf-8"))
+    try:
+        conn = http.client.HTTPSConnection("api.bfdcoin.org")
+        headers = {
+            'Content-Type': 'application/json',
+            'Token': token,
+            'User-Agent': 'Mozilla/5.0'
+        }
+        conn.request("POST", "/api?act=accountInfo", headers=headers)
+        res = conn.getresponse()
+        res_data = res.read()
 
-    # Cek apakah 'data' adalah list atau dict
-    if isinstance(data.get('data'), list):
-        # Cek apakah list kosong
-        if len(data.get('data')) > 0:
-            account_info = data.get('data')[0]  # Ambil elemen pertama
+        if res_data:
+            data = json.loads(res_data.decode("utf-8"))
         else:
-            print("Error: List 'data' kosong.")
+            print("Empty response received from the server.")
             return
-    else:
-        # Jika 'data' adalah dict, ambil langsung
-        account_info = data.get('data', {})
 
-    user_level = account_info.get('userLevel')
-    total_amount = account_info.get('totalAmount')
-    current_amount = account_info.get('currentAmount')
-
-    def format_amount(amount):
-        formatted = f"{amount:,}".replace(",", ".")
-        if amount >= 1_000_000_000:
-            return f"{formatted} ({amount // 1_000_000_000:.1f}B)"
-        elif amount >= 1_000_000:
-            return f"{formatted} ({amount // 1_000_000:.1f}M)"
+        # Check if 'data' is a list or dict
+        if isinstance(data.get('data'), list):
+            # Check if the list is empty
+            if len(data.get('data')) > 0:
+                account_info = data.get('data')[0]  # Take the first element
+            else:
+                print("Error: List 'data' is empty.")
+                return
         else:
-            return formatted
+            # If 'data' is a dict, take it directly
+            account_info = data.get('data', {})
 
-    print(
-        f'Account Info {token}\n'
-        f'  User Level    : {user_level}\n'
-        f'  Tmount        : {format_amount(total_amount)}\n'
-        f'  Cmount        : {format_amount(current_amount)}\n'
-        f'  Max Workers   : {max_workers}'
-    )
+        user_level = account_info.get('userLevel')
+        total_amount = account_info.get('totalAmount')
+        current_amount = account_info.get('currentAmount')
+
+        def format_amount(amount):
+            formatted = f"{amount:,}".replace(",", ".")
+            if amount >= 1_000_000_000:
+                return f"{formatted} ({amount // 1_000_000_000:.1f}B)"
+            elif amount >= 1_000_000:
+                return f"{formatted} ({amount // 1_000_000:.1f}M)"
+            else:
+                return formatted
+
+        print(
+            f'Account Info {token}\n'
+            f'  User Level    : {user_level}\n'
+            f'  Tmount        : {format_amount(total_amount)}\n'
+            f'  Cmount        : {format_amount(current_amount)}\n'
+            f'  Max Workers   : {max_workers}'
+        )
+    except Exception as e:
+        print(f"Error getting account info: {str(e)}")
 
 # Asynchronous function to run the requests
 async def run_requests(executor, token, max_workers):
